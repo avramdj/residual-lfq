@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "residual-lfq"
+version = "0.1.0"
+description = ""
+authors = ["Avram Djordjevic <avramdjordjevic2@gmail.com>"]
+readme = "README.md"
+packages = [
+    { include = "residual_lfq", from = "." },
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+torch = "^2.5.1"
+datasets = "^3.1.0"
+jaxtyping = "^0.2.36"
+beartype = "^0.19.0"
+torchvision = "^0.20.1"
+wandb = "^0.19.0"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.8.2"
+mypy = "^1.13.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 110
+ignore = ["F722"]
