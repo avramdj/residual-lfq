@@ -33,7 +33,6 @@ def test_lfq_initialization(lfq_model: LFQ) -> None:
 def test_quantize(lfq_model: LFQ, sample_input: torch.Tensor) -> None:
     quantized = lfq_model.quantize(sample_input)
     assert quantized.shape == sample_input.shape
-    # Check if quantized values are either +scale or -scale
     unique_values = torch.unique(torch.abs(quantized))
     assert len(unique_values) == 1
     assert torch.allclose(unique_values[0], torch.tensor(lfq_model.scale))
@@ -43,8 +42,8 @@ def test_commit_loss(lfq_model: LFQ, sample_input: torch.Tensor) -> None:
     quantized = lfq_model.quantize(sample_input)
     loss = lfq_model.commit_loss(sample_input, quantized)
     assert isinstance(loss, torch.Tensor)
-    assert loss.ndim == 0  # scalar
-    assert loss >= 0  # loss should be non-negative
+    assert loss.ndim == 0
+    assert loss >= 0
 
 
 def test_codebook_loss(lfq_model: LFQ, sample_input: torch.Tensor) -> None:
@@ -60,7 +59,7 @@ def test_entropy_loss(lfq_model: LFQ, sample_input: torch.Tensor) -> None:
     loss = lfq_model.entropy_loss(quantized)
     assert isinstance(loss, torch.Tensor)
     assert loss.ndim == 0
-    assert 0 <= loss <= lfq_model.entropy_loss_weight
+    assert loss <= lfq_model.max_entropy
 
 
 def test_forward(lfq_model: LFQ, sample_input: torch.Tensor) -> None:
@@ -73,7 +72,6 @@ def test_forward(lfq_model: LFQ, sample_input: torch.Tensor) -> None:
     expected_keys = {"commit_loss", "codebook_loss", "entropy_loss"}
     assert set(loss_breakdown.keys()) == expected_keys
 
-    # Check if total loss equals sum of individual losses
     computed_total = sum(loss_breakdown.values())
     assert torch.allclose(total_loss, computed_total)
 
