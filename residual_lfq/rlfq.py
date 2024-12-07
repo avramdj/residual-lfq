@@ -73,3 +73,21 @@ class ResidualLFQ(nn.Module):
                 loss_breakdown["entropy_loss"] + cb_loss_breakdown["entropy_loss"]
             )
         return xh, loss, loss_breakdown
+
+    def to_index(self, quantized: Float[Tensor, "B C"]) -> Float[Tensor, "B N"]:
+        indices = []
+        residual = quantized
+        for codebook in self.codebooks:
+            codebook = cast(LFQ, codebook)
+            indices.append(codebook.to_index(residual).unsqueeze(-1))
+            quantized_part = codebook.from_index(indices[-1].squeeze(-1))
+            residual = residual - quantized_part
+        return cast(Float[Tensor, "B N"], torch.cat(indices, dim=1))
+
+    def from_index(self, index: Float[Tensor, "B N"]) -> Float[Tensor, "B C"]:
+        indices = torch.split(index, 1, dim=1)
+        quantized = torch.zeros(index.shape[0], self.codebook_dim, device=index.device, dtype=torch.float32)
+        for codebook, idx in zip(self.codebooks, indices):
+            codebook = cast(LFQ, codebook)
+            quantized = quantized + codebook.from_index(idx.squeeze(-1))
+        return quantized

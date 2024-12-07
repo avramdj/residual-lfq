@@ -1,3 +1,5 @@
+from typing import cast
+
 import torch
 from torch import Tensor
 import torch.nn as nn
@@ -25,6 +27,7 @@ class LFQ(nn.Module):
         self.entropy_loss_weight = entropy_loss_weight
         self.codebook_loss_weight = codebook_loss_weight
         self.max_entropy = float(torch.log2(torch.tensor([codebook_dim])))
+        self.register_buffer("exp2mask", 2 ** torch.arange(codebook_dim, dtype=torch.float32))
 
     def quantize(self, x: Float[Tensor, "B C"]) -> Float[Tensor, "B C"]:
         x = torch.tanh(x)
@@ -80,3 +83,12 @@ class LFQ(nn.Module):
             "entropy_loss": entropy_loss,
         }
         return quantized, total_loss, loss_breakdown
+
+    def to_index(self, quantized: Float[Tensor, "B C"]) -> Float[Tensor, " B"]:
+        bits = (quantized > 0).float()
+        return cast(Float[Tensor, " B"], (bits * self.exp2mask).sum(dim=1).long())
+
+    def from_index(self, index: Float[Tensor, " B"]) -> Float[Tensor, "B C"]:
+        bits = cast(Float[Tensor, " B C"], ((index.unsqueeze(1) & self.exp2mask.long()) != 0).float())
+        quantized = torch.where(bits > 0, self.scale, -self.scale)
+        return quantized

@@ -21,6 +21,7 @@ wandb = "^0.19.0"
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.8.2"
 mypy = "^1.13.0"
+pytest = "^8.3.4"
 
 [build-system]
 requires = ["poetry-core"]
@@ -28,4 +29,14 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 110
+
+[tool.ruff.lint]
 ignore = ["F722"]
+
+[[tool.mypy.overrides]]
+module = [
+    "torchvision",
+    "torchvision.*",
+]
+ignore_missing_imports = true
+

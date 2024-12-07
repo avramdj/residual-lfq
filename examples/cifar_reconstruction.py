@@ -106,7 +106,7 @@ def train(
             if batch_idx % 500 == 0:
                 print(
                     f"Train Epoch: {epoch}\t"
-                    f"[{batch_idx * len(data)}/{len(train_loader.dataset)}\t"
+                    f"[{batch_idx * len(data)}/{len(train_loader.dataset)}\t"  # type: ignore
                     f"({500. * batch_idx / len(train_loader):.0f}%)\t"
                     f"Loss: {loss.item():.6f}\t"
                     f"Recon: {recon_loss.item():.6f}\t"
