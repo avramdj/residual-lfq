@@ -17,7 +17,7 @@ class LFQ(nn.Module):
         scale: float = 1.0,
         commit_loss_weight: float = 0.1,
         codebook_loss_weight: float = 0.1,
-        entropy_loss_weight: float = 1.0,
+        entropy_loss_weight: float = 0.001,
     ) -> None:
         super().__init__()
         self.codebook_size = codebook_size
