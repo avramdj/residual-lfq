@@ -7,17 +7,20 @@ from torchvision.datasets import CIFAR10
 from torchvision.transforms import ToTensor
 from residual_lfq import ResidualLFQ
 import wandb
-
+import math
 
 class CIFARAutoencoder(nn.Module):
     def __init__(
         self,
-        latent_dim: int = 256,
-        n_codebooks: int = 4,
-        codebook_size: int = 2,
+        codebook_size,
+        n_codebooks,
         scale: float = 1.0,
     ) -> None:
         super().__init__()
+        self.codebook_size = codebook_size
+        self.n_codebooks = n_codebooks
+        self.scale = scale
+        latent_dim = int(math.log2(codebook_size))
 
         self.encoder = nn.Sequential(
             # 32x32x3 -> 16x16x32
@@ -38,11 +41,10 @@ class CIFARAutoencoder(nn.Module):
 
         self.quantizer = ResidualLFQ(
             n_codebooks=n_codebooks,
-            codebook_size=codebook_size,
             codebook_dim=latent_dim,
             scale=scale,
-            commit_loss_weight=0.1,
-            codebook_loss_weight=0.1,
+            commit_loss_weight=0.02,
+            codebook_loss_weight=0.02,
             entropy_loss_weight=0.001,
         )
 
@@ -106,7 +108,7 @@ def train(
             if batch_idx % 500 == 0:
                 print(
                     f"Train Epoch: {epoch}\t"
-                    f"[{batch_idx * len(data)}/{len(train_loader.dataset)}\t"  # type: ignore
+                    f"[{batch_idx * len(data)}/{len(train_loader.dataset)}\t" # type: ignore[arg-type]
                     f"({500. * batch_idx / len(train_loader):.0f}%)\t"
                     f"Loss: {loss.item():.6f}\t"
                     f"Recon: {recon_loss.item():.6f}\t"
@@ -115,26 +117,31 @@ def train(
                     f"Entropy: {loss_breakdown['entropy_loss'].item():.6f}"
                 )
 
-                images = wandb.Image(data[0], caption="Original")
-                reconstructed = wandb.Image(recon[0], caption="Reconstructed")
-                wandb.log({"train/original": images, "train/reconstructed": reconstructed}, step=step)
+                model.eval()
+                with torch.no_grad():
+                    eval_recon, _, _, _ = model(data[:1])
+                    images = wandb.Image(data[0], caption="Original")
+                    reconstructed = wandb.Image(eval_recon[0], caption="Reconstructed")
+                    wandb.log({"train/original": images, "train/reconstructed": reconstructed}, step=step)
+                model.train()
 
 
 def main() -> None:
     wandb.init(
         project="residual-lfq-cifar",
+        resume=True,
         config={
-            "latent_dim": 256,
-            "n_codebooks": 4,
-            "codebook_size": 4,
+            "codebook_size": 16384,
+            "n_codebooks": 5,
             "scale": 1.0,
             "batch_size": 128,
             "learning_rate": 1e-4,
-            "epochs": 30,
+            "epochs": 100,
         },
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model_path = Path("cifar_rlfq_model.pt")
 
     data_path = Path("data")
     data_path.mkdir(exist_ok=True)
@@ -143,9 +150,8 @@ def main() -> None:
     train_loader = DataLoader(train_dataset, batch_size=wandb.config.batch_size, shuffle=True, num_workers=4)
 
     model = CIFARAutoencoder(
-        latent_dim=wandb.config.latent_dim,
-        n_codebooks=wandb.config.n_codebooks,
         codebook_size=wandb.config.codebook_size,
+        n_codebooks=wandb.config.n_codebooks,
         scale=wandb.config.scale,
     ).to(device)
 
@@ -155,10 +161,13 @@ def main() -> None:
 
     for epoch in range(1, wandb.config.epochs + 1):
         train(model, train_loader, optimizer, device, epoch)
-
-    model_path = Path("cifar_rlfq_model.pt")
-    torch.save(model.state_dict(), model_path)
-    wandb.save(str(model_path))
+        
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+        }, model_path)
+        wandb.save(str(model_path))
 
     wandb.finish()
 

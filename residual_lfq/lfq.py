@@ -1,4 +1,5 @@
 from typing import cast
+import math
 
 import torch
 from torch import Tensor
@@ -12,22 +13,30 @@ class LFQ(nn.Module):
 
     def __init__(
         self,
-        codebook_size: int,
-        codebook_dim: int,
+        codebook_size: int | None = None,
+        codebook_dim: int | None = None,
         scale: float = 1.0,
         commit_loss_weight: float = 0.1,
         codebook_loss_weight: float = 0.1,
         entropy_loss_weight: float = 0.001,
     ) -> None:
         super().__init__()
-        self.codebook_size = codebook_size
-        self.codebook_dim = codebook_dim
+        if codebook_size is not None and codebook_dim is not None:
+            raise ValueError("Either codebook_size or codebook_dim must be provided, not both")
+        if codebook_size is not None:
+            self.codebook_size = codebook_size
+            self.codebook_dim = int(math.log2(codebook_size))
+        elif codebook_dim is not None:
+            self.codebook_size = 2 ** codebook_dim
+            self.codebook_dim = codebook_dim
+        else:
+            raise ValueError("Either codebook_size or codebook_dim must be provided")
         self.scale = scale
         self.commit_loss_weight = commit_loss_weight
         self.entropy_loss_weight = entropy_loss_weight
         self.codebook_loss_weight = codebook_loss_weight
-        self.max_entropy = float(torch.log2(torch.tensor([codebook_dim])))
-        self.register_buffer("exp2mask", 2 ** torch.arange(codebook_dim, dtype=torch.float32))
+        self.max_entropy = float(torch.log2(torch.tensor([self.codebook_dim])))
+        self.register_buffer("exp2mask", 2 ** torch.arange(self.codebook_dim, dtype=torch.float32))
 
     def quantize(self, x: Float[Tensor, "B C"]) -> Float[Tensor, "B C"]:
         x = torch.tanh(x)
